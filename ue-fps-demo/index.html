@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>FPSFrontendDemo · UI 交互预览</title>
+<!--
+  ===========================================================================
+  FPSFrontendDemo · UMG 界面交互预览
+  用途：在不安装 Unreal Engine 的情况下快速预览界面布局与交互逻辑；
+        所有配色、字号、间距、控件位置与工程中 Source/.../UI/*.cpp 的实现保持一致。
+  注意：这是用 HTML/CSS 1:1 复刻的界面原型，用于预览布局与交互，
+        不是 UE 引擎运行截图。真实实现见 FPSFrontendDemo 工程（C++ 构建 UMG）。
+  ===========================================================================
+-->
+<style>
+  /* ---------- 设计令牌：与 UITheme.cpp 一一对应 ---------- */
+  :root{
+    --bg:            #0A0D12;   /* FPSTheme::Background */
+    --panel:         #0F121A;   /* FPSTheme::PanelBg     */
+    --accent:        #40D9FF;   /* FPSTheme::Accent      */
+    --danger:        #FF4D52;   /* FPSTheme::Danger      */
+    --text:          #EDF2FA;   /* FPSTheme::TextPrimary */
+    --dim:           #8C99AD;   /* FPSTheme::TextDim     */
+    --health:        #4DF28C;   /* FPSTheme::HealthHigh  */
+    --gold:          #FFC24D;
+    --s1:8px; --s2:16px; --s3:24px; --s4:32px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:"Segoe UI","Microsoft YaHei",-apple-system,sans-serif;}
+  #stage{
+    position:absolute; left:50%; top:50%;
+    width:1920px; height:1080px;
+    transform-origin:center center;
+    background:var(--bg); overflow:hidden;
+    color:var(--text);
+    user-select:none;
+  }
+
+  /* ---------- 场景（仅预览用的示意背景，工程里是真实 3D 场景） ---------- */
+  .scene{position:absolute;inset:0;
+    background:radial-gradient(ellipse at 50% 38%, #1b2430 0%, #0d1319 55%, #070a0e 100%);}
+  .floor{position:absolute;left:-25%;bottom:-10%;width:150%;height:62%;
+    background-image:
+      repeating-linear-gradient(90deg, rgba(64,217,255,.07) 0 1px, transparent 1px 120px),
+      repeating-linear-gradient(0deg, rgba(64,217,255,.07) 0 1px, transparent 1px 80px);
+    transform:perspective(700px) rotateX(62deg); transform-origin:bottom center;
+    opacity:.55;}
+  .vignette{position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(ellipse at 50% 50%, transparent 45%, rgba(0,0,0,.75) 100%);}
+
+  /* ---------- 靶子（示意用立方体） ---------- */
+  .target{position:absolute;width:90px;height:90px;cursor:crosshair;
+    transition:transform .08s;}
+  .target .face{position:absolute;inset:0;border:1px solid rgba(64,217,255,.45);}
+  .target .front{background:linear-gradient(160deg,#243645,#121b24);}
+  .target .top{height:26px;top:-26px;transform:skewX(-45deg);transform-origin:bottom left;
+    background:linear-gradient(160deg,#2e4557,#1a2731);}
+  .target .right{width:26px;right:-26px;top:-13px;transform:skewY(-45deg);transform-origin:top left;
+    background:linear-gradient(160deg,#1b2833,#0e151b);}
+  .target .hp{position:absolute;left:0;bottom:-14px;height:3px;background:var(--danger);width:100%;}
+  .target.hit{transform:translateX(-4px) scale(1.04);}
+  .target.dead{opacity:0;transform:scale(.3);transition:all .25s;}
+
+  /* ---------- 通用 ---------- */
+  .layer{position:absolute;inset:0;display:none;}
+  .layer.on{display:block;}
+  .center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);}
+
+  /* ---------- 主菜单 ---------- */
+  #menu{background:linear-gradient(115deg,#080B10 0%,#0C1119 48%,#0A0E14 100%);}
+  #menu .glow{position:absolute;width:900px;height:900px;left:-260px;top:-220px;
+    background:radial-gradient(circle, rgba(64,217,255,.12) 0%, transparent 62%);}
+  #menu .rail{position:absolute;left:0;top:0;bottom:0;width:4px;
+    background:linear-gradient(180deg,var(--accent) 0%,rgba(64,217,255,0) 100%);}
+  #menu .title{position:absolute;left:160px;top:330px;font-size:76px;font-weight:800;
+    letter-spacing:6px;line-height:1.05;}
+  #menu .title .thin{font-weight:200;color:var(--dim);}
+  #menu .sub{position:absolute;left:164px;top:432px;font-size:18px;color:var(--dim);letter-spacing:3px;}
+  #menu .btns{position:absolute;left:160px;top:540px;display:flex;flex-direction:column;gap:14px;}
+  .mbtn{width:280px;height:54px;display:flex;align-items:center;gap:14px;
+    padding-left:18px;font-size:17px;font-weight:600;letter-spacing:2px;color:var(--text);
+    background:rgba(15,18,26,.9);border:1px solid rgba(255,255,255,.07);
+    cursor:pointer;position:relative;transition:.18s;}
+  .mbtn::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:rgba(64,217,255,.35);transition:.18s;}
+  .mbtn:hover{background:rgba(64,217,255,.10);border-color:rgba(64,217,255,.5);transform:translateX(6px);}
+  .mbtn:hover::before{background:var(--accent);box-shadow:0 0 12px rgba(64,217,255,.8);}
+  .mbtn.primary{border-color:rgba(64,217,255,.55);background:rgba(64,217,255,.12);}
+  .mbtn.primary::before{background:var(--accent);}
+  #menu .ver{position:absolute;right:48px;bottom:40px;font-size:13px;color:var(--dim);letter-spacing:1px;}
+  #menu .hint{position:absolute;left:164px;top:790px;font-size:13px;color:#5A6678;letter-spacing:1px;}
+
+  /* 右侧技术要点面板：把"这个 Demo 做了什么"直接摆给对方看，避免右侧空荡 */
+  #menu .tagline{position:absolute;left:1286px;top:258px;font-size:11px;letter-spacing:4px;color:#3E4959;}
+  #menu .specs{position:absolute;right:150px;top:296px;width:520px;
+    border-left:1px solid rgba(64,217,255,.16);padding-left:36px;}
+  #menu .srow{display:flex;gap:18px;align-items:flex-start;padding:15px 0;
+    border-bottom:1px solid rgba(255,255,255,.05);}
+  #menu .srow:last-child{border-bottom:none;}
+  #menu .srow .sn{font-size:12px;color:var(--accent);letter-spacing:1px;
+    font-variant-numeric:tabular-nums;padding-top:4px;opacity:.7;min-width:22px;}
+  #menu .srow b{display:block;font-size:16px;font-weight:600;letter-spacing:.5px;color:var(--text);}
+  #menu .srow em{display:block;font-style:normal;font-size:13px;color:var(--dim);
+    margin-top:6px;line-height:1.55;letter-spacing:.3px;}
+
+  /* ---------- HUD ---------- */
+  #hud{pointer-events:none;}
+  #hud .top{position:absolute;left:50%;top:34px;transform:translateX(-50%);text-align:center;}
+  #hud .wave{font-size:13px;color:var(--dim);letter-spacing:4px;}
+  #hud .timer{font-size:40px;font-weight:800;letter-spacing:1px;margin-top:2px;}
+  #hud .score{position:absolute;left:50%;top:118px;transform:translateX(-50%);
+    font-size:15px;color:var(--accent);letter-spacing:2px;}
+
+  #hud .health{position:absolute;left:48px;bottom:64px;width:340px;}
+  #hud .label{font-size:12px;color:var(--dim);letter-spacing:3px;margin-bottom:6px;}
+  #hud .bar{width:340px;height:16px;background:rgba(255,255,255,.07);position:relative;overflow:hidden;}
+  #hud .bar .fill{height:100%;width:100%;background:var(--health);transition:width .25s ease, background .25s;}
+  #hud .bar .ghost{position:absolute;left:0;top:0;height:100%;width:100%;background:rgba(255,80,80,.55);z-index:-1;}
+  #hud .hval{font-size:16px;color:var(--text);margin-top:6px;letter-spacing:1px;font-weight:600;}
+
+  #hud .ammo{position:absolute;left:48px;bottom:150px;display:flex;align-items:flex-end;gap:8px;}
+  #hud .ammo .mag{font-size:56px;font-weight:800;line-height:.92;}
+  #hud .ammo .res{font-size:20px;color:var(--dim);padding-bottom:6px;}
+  #hud .ammo .wname{position:absolute;left:0;bottom:-20px;font-size:12px;color:var(--dim);letter-spacing:3px;}
+
+  #hud .wstate{position:absolute;right:48px;bottom:64px;text-align:right;font-size:13px;letter-spacing:2px;color:var(--dim);}
+  #hud .wstate.reloading{color:var(--danger);animation:blink .5s steps(2,end) infinite;}
+  @keyframes blink{50%{opacity:.25}}
+
+  #hud .feed{position:absolute;right:48px;top:44px;display:flex;flex-direction:column;align-items:flex-end;gap:8px;}
+  .feeditem{font-size:17px;letter-spacing:1px;color:var(--accent);opacity:0;transform:translateX(20px);
+    animation:feedin .25s forwards;text-shadow:0 0 14px rgba(64,217,255,.5);}
+  .feeditem.crit{color:var(--gold);}
+  @keyframes feedin{to{opacity:1;transform:none}}
+
+  /* 准星：4 段 + 中心点，spread 由 JS 控制 */
+  .cross{position:absolute;left:50%;top:50%;width:0;height:0;}
+  .cross i{position:absolute;background:#fff;box-shadow:0 0 3px rgba(0,0,0,.9);}
+  .cross .t{width:2px;height:14px;left:-1px;top:calc(-1 * var(--s) - 14px);}
+  .cross .b{width:2px;height:14px;left:-1px;top:var(--s);}
+  .cross .l{height:2px;width:14px;top:-1px;left:calc(-1 * var(--s) - 14px);}
+  .cross .r{height:2px;width:14px;top:-1px;left:var(--s);}
+  .cross .dot{width:3px;height:3px;left:-1.5px;top:-1.5px;background:var(--accent);}
+  .cross{--s:14px;}
+
+  /* 伤害飘字 */
+  /* 伤害飘字：暗背景上必须靠描边撑住可读性，否则看不清 */
+  .dmg{position:absolute;font-size:30px;font-weight:800;color:#fff;pointer-events:none;
+    letter-spacing:1px;
+    -webkit-text-stroke:2px rgba(0,0,0,.92);
+    text-shadow:0 0 2px #000, 0 2px 6px rgba(0,0,0,.95), 0 0 18px rgba(255,255,255,.35);
+    animation:dmgUp .85s ease-out forwards;}
+  .dmg.crit{color:var(--gold);font-size:38px;
+    -webkit-text-stroke:2px rgba(60,30,0,.9);
+    text-shadow:0 0 2px #000, 0 2px 8px rgba(0,0,0,.95), 0 0 22px rgba(255,194,77,.75);}
+  @keyframes dmgUp{
+    0%{opacity:1;transform:translate(-50%,-50%) scale(1.25);}
+    100%{opacity:0;transform:translate(-50%,-160%) scale(.9);}
+  }
+  /* 关键：这层不能 pointer-events:auto，否则会盖住场景里的靶子导致点不中。
+     点击统一由 #stage 监听 + elementsFromPoint 判定命中目标。 */
+  #hud .hitzone{position:absolute;inset:0;pointer-events:none;}
+
+  /* ---------- 暂停 ---------- */
+  #pause{background:rgba(0,0,0,.74);}
+  .panel{width:420px;background:var(--panel);border:1px solid rgba(255,255,255,.08);
+    padding:var(--s4);box-shadow:0 24px 80px rgba(0,0,0,.6);}
+  .panel h2{font-size:24px;letter-spacing:6px;font-weight:700;margin-bottom:var(--s3);}
+  .panel h2 span{display:block;width:32px;height:3px;background:var(--accent);margin-top:10px;}
+
+  /* ---------- 设置 ---------- */
+  #settings{background:rgba(0,0,0,.78);}
+  #settings .panel{width:620px;}
+  .row{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;gap:var(--s2);}
+  .row .k{font-size:14px;color:var(--dim);letter-spacing:1px;width:160px;}
+  .row .v{font-size:14px;color:var(--accent);width:70px;text-align:right;font-variant-numeric:tabular-nums;}
+  input[type=range]{-webkit-appearance:none;flex:1;height:4px;background:rgba(255,255,255,.12);outline:none;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;
+    background:var(--accent);border-radius:50%;cursor:pointer;box-shadow:0 0 10px rgba(64,217,255,.7);}
+  select{background:#0B0F15;color:var(--text);border:1px solid rgba(255,255,255,.12);
+    padding:8px 12px;font-size:14px;width:220px;outline:none;}
+  .toggle{width:46px;height:24px;background:rgba(255,255,255,.12);position:relative;cursor:pointer;transition:.2s;}
+  .toggle::after{content:"";position:absolute;left:2px;top:2px;width:20px;height:20px;background:var(--dim);transition:.2s;}
+  .toggle.on{background:rgba(64,217,255,.3);}
+  .toggle.on::after{left:24px;background:var(--accent);}
+  .actions{display:flex;gap:12px;margin-top:var(--s3);justify-content:flex-end;}
+  .abtn{padding:12px 26px;font-size:14px;letter-spacing:2px;cursor:pointer;
+    border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.03);color:var(--text);transition:.18s;}
+  .abtn:hover{border-color:rgba(64,217,255,.6);color:var(--accent);}
+  .abtn.pri{background:rgba(64,217,255,.16);border-color:rgba(64,217,255,.6);color:#DFF7FF;}
+
+  /* ---------- 角标：说明这是预览不是引擎截图 ---------- */
+  #badge{position:absolute;left:0;bottom:0;padding:10px 18px;font-size:12px;
+    color:#5A6678;letter-spacing:1px;background:rgba(0,0,0,.35);}
+  #badge b{color:#8C99AD;font-weight:600;}
+  #tip{position:absolute;right:48px;bottom:40px;font-size:12px;color:#5A6678;letter-spacing:1px;}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="scene">
+    <div class="floor"></div>
+    <!-- 示意靶子：工程中由 FPSDemoGameMode::SpawnTargets 用内置 Cube 生成 -->
+    <div class="target" data-hp="100" style="left:56%;top:44%">
+      <div class="face top"></div><div class="face right"></div><div class="face front"></div>
+      <div class="hp" style="width:100%"></div>
+    </div>
+    <div class="target" data-hp="100" style="left:34%;top:52%;transform:scale(.8)">
+      <div class="face top"></div><div class="face right"></div><div class="face front"></div>
+      <div class="hp" style="width:100%"></div>
+    </div>
+    <div class="target" data-hp="100" style="left:74%;top:56%;transform:scale(1.2)">
+      <div class="face top"></div><div class="face right"></div><div class="face front"></div>
+      <div class="hp" style="width:100%"></div>
+    </div>
+    <div class="vignette"></div>
+  </div>
+
+  <!-- ============ 主菜单 ============ -->
+  <div class="layer on" id="menu">
+    <div class="glow"></div><div class="rail"></div>
+    <div class="title">FRONTEND<span class="thin">DEMO</span></div>
+    <div class="sub">UMG UI SYSTEM · C++ DRIVEN</div>
+    <div class="btns">
+      <div class="mbtn primary" id="btnStart">START</div>
+      <div class="mbtn" id="btnSettingsFromMenu">SETTINGS</div>
+      <div class="mbtn" id="btnQuit">QUIT</div>
+    </div>
+    <div class="tagline">WHAT'S INSIDE</div>
+    <div class="specs">
+      <div class="srow"><span class="sn">01</span><div>
+        <b>UMG 组件化界面</b>
+        <em>主菜单 / 对局 HUD / 暂停 / 设置四个界面，控件树全部由 C++ 构建，零美术资源依赖</em></div></div>
+      <div class="srow"><span class="sn">02</span><div>
+        <b>委托驱动更新</b>
+        <em>血量、弹药、得分、倒计时走多播委托推送给 Widget，不做每帧 Tick 轮询</em></div></div>
+      <div class="srow"><span class="sn">03</span><div>
+        <b>动效与投影</b>
+        <em>四段准星扩散补间、伤害飘字用 ProjectWorldLocationToScreen 换算屏幕坐标</em></div></div>
+      <div class="srow"><span class="sn">04</span><div>
+        <b>输入模式与持久化</b>
+        <em>GameOnly / UIOnly 正确切换，设置项经 SaveGame 落盘，支持双入口进入并原路返回</em></div></div>
+    </div>
+
+    <div class="ver">v1.0 · Unreal Engine 5.4</div>
+    <div class="hint">SHOOTING GAME FRONTEND · UMG MODULE</div>
+  </div>
+
+  <!-- ============ HUD ============ -->
+  <div class="layer" id="hud">
+    <div class="top">
+      <div class="wave">WAVE 01</div>
+      <div class="timer" id="timer">60</div>
+    </div>
+    <div class="score" id="score">SCORE 0</div>
+
+    <div class="ammo">
+      <div class="mag" id="mag">30</div>
+      <div class="res">/ <span id="res">120</span></div>
+      <div class="wname">AR-01</div>
+    </div>
+
+    <div class="health">
+      <div class="label">HEALTH</div>
+      <div class="bar"><div class="ghost" id="hghost"></div><div class="fill" id="hfill"></div></div>
+      <div class="hval"><span id="hnow">100</span> / 100</div>
+    </div>
+
+    <div class="wstate" id="wstate">READY</div>
+    <div class="feed" id="feed"></div>
+
+    <div class="cross" id="cross">
+      <i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i><i class="dot"></i>
+    </div>
+
+    <div class="hitzone" id="hitzone"></div>
+  </div>
+
+  <!-- ============ 暂停 ============ -->
+  <div class="layer" id="pause">
+    <div class="panel center">
+      <h2>PAUSED<span></span></h2>
+      <div class="btns" style="position:static;">
+        <div class="mbtn primary" id="btnResume">RESUME</div>
+        <div class="mbtn" id="btnSettingsFromPause">SETTINGS</div>
+        <div class="mbtn" id="btnMainMenu">MAIN MENU</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ 设置 ============ -->
+  <div class="layer" id="settings">
+    <div class="panel center">
+      <h2>SETTINGS<span></span></h2>
+      <div class="row">
+        <div class="k">鼠标灵敏度</div>
+        <input type="range" id="sens" min="0.2" max="3" step="0.1" value="1">
+        <div class="v" id="sensV">1.0</div>
+      </div>
+      <div class="row">
+        <div class="k">视野 FOV</div>
+        <input type="range" id="fov" min="70" max="110" step="1" value="90">
+        <div class="v" id="fovV">90</div>
+      </div>
+      <div class="row">
+        <div class="k">主音量</div>
+        <input type="range" id="vol" min="0" max="100" step="1" value="80">
+        <div class="v" id="volV">80</div>
+      </div>
+      <div class="row">
+        <div class="k">画质档位</div>
+        <select id="quality">
+          <option>Low</option><option>Medium</option>
+          <option selected>High</option><option>Epic</option>
+        </select>
+        <div class="v"></div>
+      </div>
+      <div class="row">
+        <div class="k">准星扩散</div>
+        <div class="toggle on" id="tgCross"></div>
+        <div class="v"></div>
+      </div>
+      <div class="row">
+        <div class="k">命中飘字</div>
+        <div class="toggle on" id="tgDmg"></div>
+        <div class="v"></div>
+      </div>
+      <div class="actions">
+        <div class="abtn" id="btnReset">RESTORE DEFAULTS</div>
+        <div class="abtn pri" id="btnApply">APPLY</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="badge">界面预览 · <b>HTML/CSS 复刻 UMG 布局与交互</b>，非引擎运行截图</div>
+  <div id="tip">点击靶子射击　ESC 暂停</div>
+</div>
+
+<script>
+/* =========================================================================
+   状态与流程
+   预览里用 JS 复刻了 PlayerController + GameMode + HUD 的关键逻辑，
+   便于说明界面的数据来自哪里、什么时候更新。
+   ========================================================================= */
+const S = {
+  hp: 100, hpMax: 100,
+  mag: 30, magSize: 30, reserve: 120,
+  score: 0, combo: 0, comboTimer: 0,
+  time: 60, reloading: false,
+  inGame: false, settingsOrigin: 'menu',
+  sens: 1.0
+};
+
+const $ = id => document.getElementById(id);
+const stage = $('stage');
+
+/* ---------- 1920x1080 自适应缩放 ---------- */
+function fit(){
+  const k = Math.min(innerWidth/1920, innerHeight/1080);
+  stage.style.transform = `translate(-50%,-50%) scale(${k})`;
+}
+addEventListener('resize', fit); fit();
+
+/* ---------- 图层切换（对应 PlayerController 的界面管理） ---------- */
+function show(layer){
+  ['menu','hud','pause','settings'].forEach(n=>{
+    $(n).classList.toggle('on', n === layer);
+  });
+}
+
+/* ---------- 准星扩散：模拟 WeaponComponent 开火后 spread 的补间 ---------- */
+const cross = $('cross');
+let spread = 14;
+function setSpread(v){ spread = v; cross.style.setProperty('--s', v + 'px'); }
+function kickSpread(){
+  if(!$('tgCross').classList.contains('on')) return;
+  setSpread(26);
+  clearTimeout(kickSpread.t);
+  kickSpread.t = setTimeout(()=>{ setSpread(14); }, 90);
+}
+
+/* ---------- 伤害飘字：对应 DamageNumberWidget ---------- */
+function spawnDamage(x, y, amount, crit){
+  if(!$('tgDmg').classList.contains('on')) return;
+  const d = document.createElement('div');
+  d.className = 'dmg' + (crit ? ' crit' : '');
+  d.textContent = (crit ? '暴击 ' : '') + amount;
+  d.style.left = x + 'px'; d.style.top = y + 'px';
+  $('hud').appendChild(d);
+  setTimeout(()=>d.remove(), 900);
+}
+
+/* ---------- 击杀播报：对应 HUD 的 PushKillFeed ---------- */
+function pushFeed(text, crit){
+  const f = document.createElement('div');
+  f.className = 'feeditem' + (crit ? ' crit' : '');
+  f.textContent = text;
+  $('feed').prepend(f);
+  while($('feed').children.length > 4) $('feed').lastChild.remove();
+  setTimeout(()=>{ f.style.transition='opacity .4s'; f.style.opacity='0';
+                   setTimeout(()=>f.remove(), 420); }, 2600);
+}
+
+/* ---------- HUD 数据刷新：只在数据变化时调用，不每帧轮询 ---------- */
+function refreshHUD(){
+  const pct = Math.max(0, S.hp / S.hpMax * 100);
+  $('hfill').style.width = pct + '%';
+  $('hghost').style.width = pct + '%';
+  $('hfill').style.background = pct > 60 ? 'var(--health)' : (pct > 30 ? '#FFC24D' : 'var(--danger)');
+  $('hnow').textContent = Math.round(S.hp);
+  $('mag').textContent = S.mag;
+  $('res').textContent = S.reserve;
+  $('score').textContent = 'SCORE ' + S.score;
+  $('timer').textContent = Math.max(0, Math.ceil(S.time));
+}
+
+/* ---------- 开火：返回 true 表示这一枪真的打出去了（空枪/换弹中返回 false） ---------- */
+function fire(){
+  if(!S.inGame || S.reloading) return false;
+  if(S.mag <= 0){ reload(); return false; }
+  S.mag--; kickSpread(); refreshHUD();
+  if(S.mag === 0) setTimeout(reload, 120);   // 打空自动换弹
+  return true;
+}
+
+/* ---------- 换弹：对应 WeaponComponent::Reload 的 TimerManager 流程 ---------- */
+function reload(){
+  if(S.reloading || S.mag === S.magSize || S.reserve <= 0) return;
+  S.reloading = true;
+  $('wstate').textContent = 'RELOADING';
+  $('wstate').classList.add('reloading');
+  setTimeout(()=>{
+    const need = S.magSize - S.mag;
+    const take = Math.min(need, S.reserve);
+    S.mag += take; S.reserve -= take;
+    S.reloading = false;
+    $('wstate').textContent = 'READY';
+    $('wstate').classList.remove('reloading');
+    refreshHUD();
+  }, 1500);
+}
+
+/* ---------- 命中靶子 ----------
+   踩坑记录：最初用一个全屏透明层 #hitzone 接点击，结果它盖在场景之上，
+   靶子永远收不到 click（子弹照减、伤害不结算）。正确做法是让 HUD 层不拦点击，
+   在 #stage 上统一监听，再用 elementsFromPoint 反查这一次点在了哪个靶子上。 */
+function hitTarget(t, clientX, clientY){
+  // 视口坐标 -> 1920x1080 舞台坐标（#stage 做了整体缩放）
+  const rect = stage.getBoundingClientRect();
+  const k = rect.width / 1920;
+  const cx = (clientX - rect.left) / k;
+  const cy = (clientY - rect.top) / k;
+
+  const crit = Math.random() < 0.25;
+  const dmg = crit ? 50 : 25;
+  spawnDamage(cx, cy, dmg, crit);
+
+  t.classList.add('hit');
+  setTimeout(()=>t.classList.remove('hit'), 80);
+
+  let hp = parseInt(t.dataset.hp) - dmg;
+  t.dataset.hp = hp;
+  t.querySelector('.hp').style.width = Math.max(0, hp) + '%';
+
+  if(hp <= 0){
+    t.classList.add('dead');
+    const gained = 100 + (crit ? 50 : 0);
+    S.score += gained; S.combo++;
+    pushFeed('KILL  +' + gained + (S.combo > 1 ? '  x' + S.combo : ''), crit);
+    // 靶子死亡对玩家造成少量伤害（用来演示血条变色与低血量告警）
+    S.hp = Math.max(8, S.hp - 12);
+    refreshHUD();
+    setTimeout(()=>{
+      t.classList.remove('dead');
+      t.dataset.hp = 100;
+      t.querySelector('.hp').style.width = '100%';
+    }, 1500);
+  }
+}
+
+stage.addEventListener('click', e=>{
+  if(!S.inGame) return;
+  // 菜单/弹窗层内的点击不当作射击（否则点 START 会先白扣一发子弹）
+  if(e.target && e.target.closest && e.target.closest('#menu, #pause, #settings')) return;
+  if(!fire()) return;                       // 空枪 / 换弹中：扣扳机但不结算伤害
+
+  // 点击穿透后反查命中的靶子（closest 兼容点在靶子内部的子元素上）
+  const hit = document.elementsFromPoint(e.clientX, e.clientY)
+    .map(el => (el && el.closest) ? el.closest('.target') : null)
+    .find(el => el);
+  if(hit && !hit.classList.contains('dead')) hitTarget(hit, e.clientX, e.clientY);
+});
+
+/* ---------- 主菜单 ---------- */
+$('btnStart').onclick = ()=>{
+  S.inGame = true;
+  stage.style.cursor = 'crosshair';
+  show('hud');
+  refreshHUD();
+  $('tip').style.opacity = 1;
+};
+$('btnQuit').onclick = ()=>{
+  $('btnQuit').textContent = 'DEMO 预览无法退出';
+  setTimeout(()=>$('btnQuit').textContent='QUIT', 1400);
+};
+$('btnSettingsFromMenu').onclick = ()=>{ S.settingsOrigin='menu'; show('settings'); $('settings').classList.add('on'); };
+
+/* ---------- 暂停（ESC） ---------- */
+addEventListener('keydown', e=>{
+  // R 换弹：与 Config/DefaultInput.ini 里的 ActionMappings Reload=R 保持一致
+  if(e.key.toLowerCase() === 'r'){
+    if(S.inGame && !$('pause').classList.contains('on') && !$('settings').classList.contains('on')) reload();
+    return;
+  }
+  if(e.key !== 'Escape') return;
+  if($('settings').classList.contains('on')){ closeSettings(); return; }
+  if(!S.inGame) return;
+  if($('pause').classList.contains('on')){
+    $('pause').classList.remove('on'); $('hud').classList.add('on');
+  } else {
+    $('pause').classList.add('on'); $('hud').classList.remove('on');
+  }
+});
+$('btnResume').onclick = ()=>{ $('pause').classList.remove('on'); $('hud').classList.add('on'); };
+$('btnMainMenu').onclick = ()=>{
+  S.inGame = false; S.score = 0; S.combo = 0; S.time = 60;
+  S.hp = 100; S.mag = 30; S.reserve = 120; S.reloading = false;
+  $('wstate').textContent = 'READY';
+  $('wstate').classList.remove('reloading');
+  $('feed').innerHTML = '';
+  stage.style.cursor = '';
+  refreshHUD();          // 回菜单时也刷新一次，避免下次进入残留旧弹药数
+  show('menu');
+};
+$('btnSettingsFromPause').onclick = ()=>{ S.settingsOrigin='pause'; $('pause').classList.remove('on'); show('settings'); };
+
+/* ---------- 设置 ---------- */
+function bindRange(id, out, fmt){
+  const el = $(id), o = $(out);
+  const upd = ()=>{ o.textContent = fmt ? fmt(el.value) : el.value; };
+  el.oninput = upd; upd();
+}
+bindRange('sens','sensV', v=>Number(v).toFixed(1));
+bindRange('fov','fovV');
+bindRange('vol','volV');
+$('sens').oninput = function(){ $('sensV').textContent = Number(this.value).toFixed(1); S.sens = Number(this.value); };
+$('tgCross').onclick = ()=>$('tgCross').classList.toggle('on');
+$('tgDmg').onclick = ()=>$('tgDmg').classList.toggle('on');
+
+function closeSettings(){
+  if(S.settingsOrigin === 'pause'){ show('pause'); }
+  else { show('menu'); }
+  if(!S.inGame && S.settingsOrigin === 'pause') show('menu');
+}
+$('btnApply').onclick = ()=>{ closeSettings(); };
+$('btnReset').onclick = ()=>{
+  $('sens').value = 1; $('sensV').textContent = '1.0';
+  $('fov').value = 90; $('fovV').textContent = '90';
+  $('vol').value = 80; $('volV').textContent = '80';
+  $('quality').value = 'High';
+  $('tgCross').classList.add('on');
+  $('tgDmg').classList.add('on');
+};
+
+/* ---------- 回合倒计时 ---------- */
+setInterval(()=>{
+  if(!S.inGame) return;
+  if($('pause').classList.contains('on')) return;
+  S.time = Math.max(0, S.time - 1);
+  refreshHUD();
+  if(S.time === 0){ pushFeed('ROUND OVER', false); S.time = 60; S.score = 0; refreshHUD(); }
+}, 1000);
+
+/* ---------- 血量缓慢回复（让血条演示有变化） ---------- */
+setInterval(()=>{
+  if(!S.inGame || S.hp >= S.hpMax) return;
+  S.hp = Math.min(S.hpMax, S.hp + 4);
+  refreshHUD();
+}, 1200);
+
+/* 提示条 4 秒后淡出 */
+setTimeout(()=>{ $('tip').style.transition='opacity 1s'; $('tip').style.opacity = 0; }, 6000);
+
+refreshHUD();
+</script>
+</body>
+</html>

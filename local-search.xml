@@ -4,6 +4,35 @@
   
   
   <entry>
+    <title>为一个 UE 前端实习岗做的 demo，和它的网页预览</title>
+    <link href="/2026/10/27/ue-fps-frontend-demo/"/>
+    <url>/2026/10/27/ue-fps-frontend-demo/</url>
+    
+    <content type="html"><![CDATA[<p>BOSS 上刷到南坪一个 UE 前端实习。JD 里三行关键要求：UMG 模块开发、界面交互和资源集成调试；熟悉 UE 前端流程，做过 C++ demo；喜欢射击游戏优先。</p><p>我拿这三条对自己。C++ 写过，射击游戏常年玩，UMG 只跟着教程点过蓝图。缺的那块正好是最核心的。想了想，与其等面试被问，不如先做出来。</p><h2 id="工程里有什么"><a href="#工程里有什么" class="headerlink" title="工程里有什么"></a>工程里有什么</h2><p>UE 5.4 新建的 C++ 工程，一共 50 个文件，里面没有一个美术资源。界面全部在 C++ 里调 UMG 搭出来，颜色、字号、动画曲线写成常量表和函数，换套配色改一处就够。</p><p>界面四个：主菜单、游戏内 HUD、暂停菜单、设置页。逻辑拆成两个组件，HealthComponent 管血量和受击结算，WeaponComponent 管弹匣、射速和换弹状态机。GameMode 串流程，PlayerController 管输入和界面切换。</p><p>血量、弹药、暂停这些状态从组件走到界面，中间不经过蓝图，面试的时候可以一行行讲清楚。</p><h2 id="为什么又做了个网页版"><a href="#为什么又做了个网页版" class="headerlink" title="为什么又做了个网页版"></a>为什么又做了个网页版</h2><p>招聘方不会为了看一个 demo 去装 60 多个 G 的引擎。我这台机器装完 UE 5.4 加工程缓存，空间也是掐着算的。</p><p>所以照着做好的界面又复刻了一套 HTML 和 CSS，一比一还原布局、配色和动效。点 START 进游戏，左键射击，R 换弹，ESC 暂停，菜单和 HUD 之间的切换都是通的。页面底部写清楚了这是 HTML 复刻、不是引擎截图，免得误会。</p><p>在线预览：<a href="https://vnins.github.io/ue-fps-demo/">https://vnins.github.io/ue-fps-demo/</a></p><h2 id="复刻时踩的两个坑"><a href="#复刻时踩的两个坑" class="headerlink" title="复刻时踩的两个坑"></a>复刻时踩的两个坑</h2><p>第一个是遮挡。HUD 的血条和准星用绝对定位贴着边缘，暂停菜单的遮罩盖不全，ESC 之后血条还在下面露出来。调了层级，把遮罩单独提到最上层才干净。</p><p>第二个是误扣弹。按住左键时点击事件连续触发，弹匣掉得比设定射速快一截。重新算了射击节拍，加上射速冷却，数字才对上。</p><p>两个问题都是写的时候想不到、跑起来一眼就看见的那种。</p><h2 id="现在的状态"><a href="#现在的状态" class="headerlink" title="现在的状态"></a>现在的状态</h2><p>工程能编译能跑，界面流程完整。C++ 那部分按 JD 的关键词整理了一份对照表，面试可以直接讲哪块对应哪条要求。</p><p>预览链接再放一次：<a href="https://vnins.github.io/ue-fps-demo/">https://vnins.github.io/ue-fps-demo/</a></p>]]></content>
+    
+    
+    <categories>
+      
+      <category>求职</category>
+      
+    </categories>
+    
+    
+    <tags>
+      
+      <tag>UE</tag>
+      
+      <tag>UMG</tag>
+      
+      <tag>求职</tag>
+      
+    </tags>
+    
+  </entry>
+  
+  
+  
+  <entry>
     <title>一千块以内的 A7R4 广角变焦，我把能转接的都翻了一遍</title>
     <link href="/2026/10/25/a7r4-wide-angle-lens/"/>
     <url>/2026/10/25/a7r4-wide-angle-lens/</url>
